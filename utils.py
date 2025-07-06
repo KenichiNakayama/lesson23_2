@@ -8,12 +8,30 @@
 import os
 from dotenv import load_dotenv
 import streamlit as st
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.schema import HumanMessage
-from langchain_openai import ChatOpenAI
-from langchain.chains import create_history_aware_retriever, create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
 import constants as ct
+
+# LangChainのインポートを遅延読み込みに変更
+def _import_langchain_modules():
+    """LangChainモジュールの遅延インポート"""
+    try:
+        from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+        from langchain.schema import HumanMessage
+        from langchain_openai import ChatOpenAI
+        from langchain.chains import create_history_aware_retriever, create_retrieval_chain
+        from langchain.chains.combine_documents import create_stuff_documents_chain
+        return {
+            'ChatPromptTemplate': ChatPromptTemplate,
+            'MessagesPlaceholder': MessagesPlaceholder,
+            'HumanMessage': HumanMessage,
+            'ChatOpenAI': ChatOpenAI,
+            'create_history_aware_retriever': create_history_aware_retriever,
+            'create_retrieval_chain': create_retrieval_chain,
+            'create_stuff_documents_chain': create_stuff_documents_chain
+        }
+    except ImportError as e:
+        st.error(f"LangChainライブラリのインポートに失敗しました: {e}")
+        st.stop()
+        return None
 
 
 ############################################################
@@ -69,6 +87,19 @@ def get_llm_response(chat_message):
     Returns:
         LLMからの回答
     """
+    # LangChainモジュールを遅延インポート
+    lc_modules = _import_langchain_modules()
+    if not lc_modules:
+        return None
+    
+    ChatPromptTemplate = lc_modules['ChatPromptTemplate']
+    MessagesPlaceholder = lc_modules['MessagesPlaceholder']
+    HumanMessage = lc_modules['HumanMessage']
+    ChatOpenAI = lc_modules['ChatOpenAI']
+    create_history_aware_retriever = lc_modules['create_history_aware_retriever']
+    create_retrieval_chain = lc_modules['create_retrieval_chain']
+    create_stuff_documents_chain = lc_modules['create_stuff_documents_chain']
+
     # LLMのオブジェクトを用意
     llm = ChatOpenAI(model_name=ct.MODEL, temperature=ct.TEMPERATURE)
 

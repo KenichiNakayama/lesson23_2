@@ -5,8 +5,26 @@
 ############################################################
 # ライブラリの読み込み
 ############################################################
-from langchain_community.document_loaders import PyMuPDFLoader, Docx2txtLoader, TextLoader
-from langchain_community.document_loaders.csv_loader import CSVLoader
+# Document loaderの遅延インポート関数
+def _get_document_loaders():
+    """Document loaderの遅延インポート"""
+    try:
+        from langchain_community.document_loaders import PyMuPDFLoader, Docx2txtLoader, TextLoader
+        from langchain_community.document_loaders.csv_loader import CSVLoader
+        return {
+            ".pdf": PyMuPDFLoader,
+            ".docx": Docx2txtLoader,
+            ".csv": lambda path: CSVLoader(path, encoding="utf-8"),
+            ".txt": TextLoader
+        }
+    except ImportError:
+        # LangChainが利用できない場合のフォールバック
+        return {
+            ".pdf": None,
+            ".docx": None,
+            ".csv": None,
+            ".txt": None
+        }
 
 
 ############################################################
@@ -47,11 +65,18 @@ TEMPERATURE = 0.5
 # RAG参照用のデータソース系
 # ==========================================
 RAG_TOP_FOLDER_PATH = "./data"
-SUPPORTED_EXTENSIONS = {
-    ".pdf": PyMuPDFLoader,
-    ".docx": Docx2txtLoader,
-    ".csv": lambda path: CSVLoader(path, encoding="utf-8")
-}
+RAG_RETRIEVER_K = 5  # ベクターストアから取得する関連ドキュメントの数
+#問題2 マジックナンバーを変数化
+RAG_CHUNK_SIZE = 500  # テキスト分割時のチャンクサイズ
+RAG_CHUNK_OVERLAP = 50  # テキスト分割時のチャンク間のオーバーラップサイズ
+
+# Document loaderを取得する関数
+def get_supported_extensions():
+    """サポートされている拡張子とloaderの辞書を取得"""
+    return _get_document_loaders()
+
+# デフォルトの拡張子定義（後方互換性のため）
+SUPPORTED_EXTENSIONS = {}  # 実際には get_supported_extensions() を使用
 WEB_URL_LOAD_TARGETS = [
     "https://generative-ai.web-camp.io/"
 ]

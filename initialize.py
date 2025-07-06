@@ -14,11 +14,26 @@ import unicodedata
 from dotenv import load_dotenv
 import streamlit as st
 from docx import Document
-from langchain_community.document_loaders import WebBaseLoader
-from langchain.text_splitter import CharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings
-from langchain_community.vectorstores import Chroma
 import constants as ct
+
+# LangChainモジュールの遅延インポート関数
+def _import_langchain_modules():
+    """LangChainモジュールの遅延インポート"""
+    try:
+        from langchain_community.document_loaders import WebBaseLoader
+        from langchain.text_splitter import CharacterTextSplitter
+        from langchain_openai import OpenAIEmbeddings
+        from langchain_community.vectorstores import Chroma
+        return {
+            'WebBaseLoader': WebBaseLoader,
+            'CharacterTextSplitter': CharacterTextSplitter,
+            'OpenAIEmbeddings': OpenAIEmbeddings,
+            'Chroma': Chroma
+        }
+    except ImportError as e:
+        st.error(f"LangChainライブラリのインポートに失敗しました: {e}")
+        st.stop()
+        return None
 
 
 ############################################################
@@ -102,6 +117,16 @@ def initialize_retriever():
     """
     画面読み込み時にRAGのRetriever（ベクターストアから検索するオブジェクト）を作成
     """
+    # LangChainモジュールを遅延インポート
+    lc_modules = _import_langchain_modules()
+    if not lc_modules:
+        return
+    
+    WebBaseLoader = lc_modules['WebBaseLoader']
+    CharacterTextSplitter = lc_modules['CharacterTextSplitter']
+    OpenAIEmbeddings = lc_modules['OpenAIEmbeddings']
+    Chroma = lc_modules['Chroma']
+
     # ロガーを読み込むことで、後続の処理中に発生したエラーなどがログファイルに記録される
     logger = logging.getLogger(ct.LOGGER_NAME)
 
@@ -123,8 +148,8 @@ def initialize_retriever():
     
     # チャンク分割用のオブジェクトを作成
     text_splitter = CharacterTextSplitter(
-        chunk_size=500,
-        chunk_overlap=50,
+        chunk_size=ct.RAG_CHUNK_SIZE,
+        chunk_overlap=ct.RAG_CHUNK_OVERLAP,
         separator="\n"
     )
 
@@ -135,7 +160,9 @@ def initialize_retriever():
     db = Chroma.from_documents(splitted_docs, embedding=embeddings)
 
     # ベクターストアを検索するRetrieverの作成
-    st.session_state.retriever = db.as_retriever(search_kwargs={"k": 3})
+    #問題1 3から5に変更
+    #マジックナンバーを修正
+    st.session_state.retriever = db.as_retriever(search_kwargs={"k": ct.RAG_RETRIEVER_K})
 
 
 def initialize_session_state():
@@ -156,6 +183,13 @@ def load_data_sources():
     Returns:
         読み込んだ通常データソース
     """
+    # LangChainモジュールを遅延インポート
+    lc_modules = _import_langchain_modules()
+    if not lc_modules:
+        return []
+    
+    WebBaseLoader = lc_modules['WebBaseLoader']
+    
     # データソースを格納する用のリスト
     docs_all = []
     # ファイル読み込みの実行（渡した各リストにデータが格納される）
@@ -212,10 +246,13 @@ def file_load(path, docs_all):
     # ファイル名（拡張子を含む）を取得
     file_name = os.path.basename(path)
 
+    # サポートされている拡張子の辞書を取得
+    supported_extensions = ct.get_supported_extensions()
+    
     # 想定していたファイル形式の場合のみ読み込む
-    if file_extension in ct.SUPPORTED_EXTENSIONS:
+    if file_extension in supported_extensions and supported_extensions[file_extension] is not None:
         # ファイルの拡張子に合ったdata loaderを使ってデータ読み込み
-        loader = ct.SUPPORTED_EXTENSIONS[file_extension](path)
+        loader = supported_extensions[file_extension](path)
         docs = loader.load()
         docs_all.extend(docs)
 
