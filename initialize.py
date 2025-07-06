@@ -11,7 +11,12 @@ from logging.handlers import TimedRotatingFileHandler
 from uuid import uuid4
 import sys
 import unicodedata
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    # dotenvがない場合のフォールバック
+    def load_dotenv():
+        pass
 import streamlit as st
 from docx import Document
 import constants as ct
@@ -39,8 +44,12 @@ def _import_langchain_modules():
 ############################################################
 # 設定関連
 ############################################################
-# 「.env」ファイルで定義した環境変数の読み込み
-load_dotenv()
+# 「.env」ファイルで定義した環境変数の読み込み（条件付き）
+try:
+    load_dotenv()
+except NameError:
+    # load_dotenvがインポートされていない場合
+    pass
 
 
 ############################################################
